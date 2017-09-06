@@ -92,6 +92,6 @@ for root, dirs, files in os.walk(rootDir):
                 results[path] = result
 
 # TODO topological sort instead of alphabetical sort!
-for (path, result) in sorted(results.items(), key=lambda s: s[0].lower()):
+for (path, result) in sorted(results.items(), key=lambda s: os.path.split(s[0])[1].lower()):
     print result
 
