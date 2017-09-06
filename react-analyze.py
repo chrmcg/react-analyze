@@ -24,8 +24,23 @@
 import os
 import sys
 import re
+import argparse
+from toposort import toposort
 
-rootDir = sys.argv[1] if len(sys.argv) > 1 else '.'
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "dir",
+    nargs="?",
+    default=".",
+    help="the directory to scan (defaults to current working directory)"
+)
+parser.add_argument(
+    "-t",
+    "--topological_sort",
+    action="store_true",
+    help="sort output based on component hierarchy"
+)
+args = parser.parse_args()
 
 propsRegex = re.compile("props\.(\w+)")
 stateRegex = re.compile("state\.(\w+)")
@@ -33,12 +48,13 @@ renderRegex = re.compile("render\s*\(.*\)")
 tagRegex = re.compile("<(\w+)")
 
 results = {}
+graph = {}
 
-for root, dirs, files in os.walk(rootDir):
+for root, dirs, files in os.walk(args.dir):
     for filename in files:
         result = ''
         path = os.path.join(root, filename)
-        relativePath = os.path.relpath(path, rootDir)
+        relativePath = os.path.relpath(path, args.dir)
         relativeDir = os.path.split(relativePath)[0]
         if filename.endswith('.js') or filename.endswith('.jsx'):
 
@@ -69,9 +85,12 @@ for root, dirs, files in os.walk(rootDir):
                     if tag not in tags:
                         tags[tag] = []
                     tags[tag].append(i+1)
-                    
 
             if hasRenderFunction:
+                filenameWithoutExtension = os.path.splitext(filename)[0]
+                if filenameWithoutExtension not in graph:
+                    graph[filenameWithoutExtension] = []
+
                 result = filename + ' (/' + relativeDir + ')\n'
                 for prop, lst in sorted(props.items()):
                     result += '    ' + prop + ': ' + str(lst) + '\n'
@@ -87,11 +106,17 @@ for root, dirs, files in os.walk(rootDir):
 
                 for tag, lst in sorted(tags.items()):
                     result += '    <' + tag + '>: ' + str(lst) + '\n'
+                    graph[filenameWithoutExtension].append(tag)
 
                 result += '\n'
-                results[path] = result
+                results[filenameWithoutExtension] = result
 
-# TODO topological sort instead of alphabetical sort!
-for (path, result) in sorted(results.items(), key=lambda s: os.path.split(s[0])[1].lower()):
-    print result
+if args.topological_sort:
+    topologically_sorted_filenames = toposort(graph)
+    for filename in topologically_sorted_filenames:
+        print results[filename]
+else:
+    # sort alphabetically
+    for (path, result) in sorted(results.items(), key=lambda s: s[0].lower()):
+        print result
 
