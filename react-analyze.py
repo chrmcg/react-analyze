@@ -45,6 +45,8 @@ args = parser.parse_args()
 propsRegex = re.compile("props\.(\w+)")
 stateRegex = re.compile("state\.(\w+)")
 renderRegex = re.compile("render\s*\(.*\)")
+createContainerRegex = re.compile("createContainer\s*\(")
+containerTargetRegex = re.compile("createContainer\s*\(.*,\s*(\w+)\)")
 tagRegex = re.compile("<(\w+)")
 
 results = {}
@@ -62,6 +64,7 @@ for root, dirs, files in os.walk(args.dir):
             state = {}
             tags = {}
             hasRenderFunction = False
+            hasCreateContainer = False
 
             for i, line in enumerate(open(path)):
 
@@ -80,13 +83,16 @@ for root, dirs, files in os.walk(args.dir):
                 for match in re.finditer(renderRegex, line):
                     hasRenderFunction = True
 
+                for match in re.finditer(createContainerRegex, line):
+                    hasCreateContainer = True
+
                 for match in re.finditer(tagRegex, line):
                     tag = match.groups()[0]
                     if tag not in tags:
                         tags[tag] = []
                     tags[tag].append(i+1)
 
-            if hasRenderFunction:
+            if hasRenderFunction or hasCreateContainer:
                 filenameWithoutExtension = os.path.splitext(filename)[0]
                 if filenameWithoutExtension not in graph:
                     graph[filenameWithoutExtension] = []
@@ -110,6 +116,29 @@ for root, dirs, files in os.walk(args.dir):
 
                 result += '\n'
                 results[filenameWithoutExtension] = result
+
+            if hasCreateContainer:
+                with open(path) as f:
+                    monoline = " ".join(line.strip() for line in f)
+
+                filenameWithoutExtension = os.path.splitext(filename)[0]
+                if filenameWithoutExtension not in graph:
+                    graph[filenameWithoutExtension] = []
+
+                result = ''
+                if (filenameWithoutExtension not in results):
+                    result = filename + ' (/' + relativeDir + ')\n'
+
+                for match in re.finditer(containerTargetRegex, monoline):
+                    tag = match.groups()[0]
+                    result += '    <' + tag + '> (container)\n'
+                    if tag != filenameWithoutExtension:
+                        graph[filenameWithoutExtension].append(tag)
+                
+                if filenameWithoutExtension in results:
+                    results[filenameWithoutExtension] = results[filenameWithoutExtension] + result
+                else:
+                    results[filenameWithoutExtension] = result
 
 if args.topological_sort:
     topologically_sorted_filenames = toposort(graph)

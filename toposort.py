@@ -40,7 +40,7 @@ def toposort(dict_of_edges):
             return
         if node['visited']:
             # TODO somehow remove edges based on relevance scores to create a close-enough DAG
-            raise Exception('Component dependency graph is not a DAG')
+            raise Exception('Component dependency graph is not a DAG: at ' + node_name)
 
         node['visited'] = True
 
